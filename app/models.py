@@ -22,6 +22,9 @@ class User(db.Model):
     phone = db.Column(db.String(15))
     role_id = db.Column(db.Integer, db.ForeignKey("roles.role_id", ondelete="CASCADE"), default=2)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    verified = db.Column(db.Boolean, default=False)
+    otp = db.Column(db.String(6))
+    otp_expiry = db.Column(db.DateTime)
 
     role = db.relationship("Role", back_populates="users")
     addresses = db.relationship("Address", back_populates="user", cascade="all, delete")

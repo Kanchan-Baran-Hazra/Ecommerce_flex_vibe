@@ -4,7 +4,8 @@ from app.models import Role, User
 from sqlalchemy.exc import IntegrityError
 from flask_jwt_extended import JWTManager, create_access_token,create_refresh_token,jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
-import datetime
+from datetime import datetime,timedelta
+from app.routes.Email_message import genrate_otp,send_mail
 
 
 login=Blueprint('userLogin', __name__, url_prefix='/userLogin')
@@ -46,13 +47,20 @@ def signup():
 
     if User.query.filter_by(email=data['email']).first():
         return jsonify({"error": "Email already exists"}), 400
+    
+    otp=genrate_otp()
+    mess=send_mail(otp,data['full_name'],data['email'])
+    if mess:
+        hashed_pw = generate_password_hash(data['password'])
+        new_user = User(full_name=data['full_name'], email=data['email'], password_hash=hashed_pw)
+        new_user.otp = str(otp)
+        new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
+        db.session.add(new_user)
+        db.session.commit()
 
-    hashed_pw = generate_password_hash(data['password'])
-    new_user = User(full_name=data['full_name'], email=data['email'], password_hash=hashed_pw)
-    db.session.add(new_user)
-    db.session.commit()
-
-    return jsonify({"message": "User registered successfully"}), 201
+        return jsonify({"message": "User registered successfully",'sig':1}), 201
+    else:
+        return jsonify({'message':'Email not send..','sig':0}), 400
     
 
 # 🔐 SIGNIN
@@ -61,7 +69,7 @@ def signin():
     data = request.get_json()
 
     user = User.query.filter_by(email=data['email']).first()
-    if not user or not check_password_hash(user.password_hash, data['password']):
+    if not user or not check_password_hash(user.password_hash, data['password']) or not user.verified:
         return jsonify({"error": "Invalid credentials"}), 401
 
     # Generate JWT token (valid for 1 hour)
@@ -77,3 +85,4 @@ def refresh():
     current_user = get_jwt_identity()
     new_token = create_access_token(identity=current_user)
     return jsonify({"token": new_token}), 200
+

@@ -5,9 +5,14 @@ import cloudinary.api
 import cloudinary.uploader
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from flask_mail import Mail
+from flask_migrate import Migrate
+
 
 db = SQLAlchemy()
 jwt = JWTManager()
+mail=Mail()
+migrate=Migrate()
 
 def create_app():
     app = Flask(__name__)
@@ -15,6 +20,8 @@ def create_app():
 
     db.init_app(app)
     jwt.init_app(app)
+    mail.init_app(app)
+    migrate.init_app(app,db)
     CORS(app)
 
     from app.routes.main import main
@@ -28,6 +35,12 @@ def create_app():
 
     from app.routes.product import product
     app.register_blueprint(product)
+
+    from app.routes.Email_message import email_send
+    app.register_blueprint(email_send)
+
+    from app.routes.otp_verify import otp_ver
+    app.register_blueprint(otp_ver)
     
     # ✅ Cloudinary Config
     cloudinary.config(
