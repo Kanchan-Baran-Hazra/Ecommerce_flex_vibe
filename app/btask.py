@@ -2,6 +2,9 @@ from flask_mail import Message
 from app import mail
 from threading import Thread
 from flask import current_app
+from datetime import datetime,timedelta
+from app.models import User
+from app import db
 
 def send_async_email(app,msg):
     with app.app_context():
@@ -19,3 +22,19 @@ def task_give_to_thread(subject, recipients, body, html=None):
     thread = Thread(target=send_async_email, args=(app, msg))
     thread.start()
     return thread
+
+def delete_unverified_users(app):
+
+    expiry_time = datetime.utcnow() - timedelta(hours=24)
+
+    with app.app_context():
+        unverified_users = User.query.filter(
+            User.verified == False,
+            User.created_at < expiry_time
+        ).all()
+
+        for user in unverified_users:
+            db.session.delete(user)
+
+        db.session.commit()
+    print("Cleaned unverified accounts")
