@@ -54,29 +54,35 @@ def add_product():
         name = request.form.get('name')
         description = request.form.get('description')
         price = request.form.get('price')
-        sku = request.form.get('stock_quantity')
+        stock_quantity = request.form.get('stock_quantity')
         category_id = request.form.get('category_id')
         brand_id = request.form.get('brand_id')
         discount = request.form.get('discount')
         is_active = request.form.get('is_active')
+        if isinstance(is_active, str):
+            is_active = is_active.lower() == "true"
 
         # Get the image file
-        image = request.files.get('image')
+        images = request.files.getlist('image')
 
         # Upload image to Cloudinary if provided
-        image_url = None
-        if not image:
-            return jsonify({"message": "Image file is required"}), 400
-        upload_result = cloudinary.uploader.upload(image)
-        image_url = upload_result.get('secure_url')
-        public_id = upload_result.get('public_id')
+        uploaded_urls = []
+        uploaded_public_ids = []
+
+        if not images or len(images) == 0:
+            return jsonify({"message": "At least one image is required"}), 400
+        
+        for img in images:
+            upload_result = cloudinary.uploader.upload(img)
+            uploaded_urls.append(upload_result.get('secure_url'))
+            uploaded_public_ids.append(upload_result.get('public_id'))
 
         # Create new product
         new_product = Product(
             name=name,
             description=description,
             price=price,
-            sku=sku,
+            sku=stock_quantity,
             category_id=category_id,
             brand_id=brand_id,
             discount=discount,
@@ -89,13 +95,14 @@ def add_product():
         return jsonify({
             "message": "Product added successfully",
             "product_id": new_product.product_id,
-            "image_url": image_url
+            "image_urls": uploaded_urls
         }), 201
     
     except Exception as e:
-        # ❌ If anything fails → delete uploaded Cloudinary image
-        if 'public_id' in locals():
-            cloudinary.uploader.destroy(public_id)
+        # If fail → delete all uploaded images
+        for pid in uploaded_public_ids:
+            cloudinary.uploader.destroy(pid)
+
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
@@ -105,22 +112,27 @@ def add_image():
     try:
         data = request.get_json()
         product_id = data.get('product_id')
-        image_url= data.get('image_url')
+        image_urls = data.get('image_urls')  # list of URLs
 
-        if not product_id or not image_url:
-            return jsonify({"message": "product_id and image_url are required"}), 400
+        if not product_id or not image_urls:
+            return jsonify({"message": "product_id and image_urls are required"}), 400
 
         product = Product.query.get(product_id)
         if not product:
             return jsonify({"message": "Product not found"}), 404
 
-        new_image = ProductImage(product_id=product_id, image_url=image_url)
-        db.session.add(new_image)
+        # Save each image URL
+        for url in image_urls:
+            new_image = ProductImage(product_id=product_id, image_url=url)
+            db.session.add(new_image)
+
         db.session.commit()
 
         return jsonify({
-            "message": "Image added successfully",
+            "message": "Images added successfully",
+            "count": len(image_urls)
         }), 201
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
