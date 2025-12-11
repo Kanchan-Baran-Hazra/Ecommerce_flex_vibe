@@ -86,3 +86,23 @@ def refresh():
     new_token = create_access_token(identity=current_user)
     return jsonify({"token": new_token}), 200
 
+#Resend OTP
+@login.route('/resend_otp',methods=['POST'])
+def resend_otp():
+    data = request.get_json()
+    try:
+        new_user=User.query.filter_by(email=data['email']).first()
+    except:
+        return jsonify({'message':"User not found.!!"}), 400
+
+    otp=genrate_otp()
+    mess=send_mail(otp,data['full_name'],data['email'])
+
+    if mess:
+        new_user.otp = str(otp)
+        new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
+        db.session.commit()
+
+        return jsonify({"message": "OTP sended",'sig':1}), 201
+    else:
+        return jsonify({'message':'Email not send..','sig':0}), 400

@@ -172,3 +172,56 @@ def get_products():
         return jsonify(product_list), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@product.route('get_product/<int:product_id>', methods=['GET'])
+def get_product(product_id):
+    product = Product.query.get(product_id)   # fetch using primary key
+
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    
+    images=ProductImage.query.filter_by(product_id=product_id).all()
+    # print(images)
+    image_list = [
+        img.image_url
+        for img in images
+    ]
+    return jsonify({
+        "id": product.product_id,
+        "name": product.name,
+        "price": product.price,
+        "description": product.description,
+        'imges':image_list
+    }), 200
+
+
+@product.route('/get_multiple', methods=['POST'])
+def get_multiple_products():
+    data = request.get_json()
+    ids = data.get("ids")
+
+    if not ids or not isinstance(ids, list):
+        return jsonify({"error": "ids must be a list"}), 400
+    
+    if len(ids)==0:
+        return jsonify({'message':'Invalid product..'})
+
+    products = Product.query.filter(Product.product_id.in_(ids)).all()
+
+    result = []
+    for p in products:
+        images=ProductImage.query.filter_by(product_id=p.product_id).all()
+        image_list = [
+            img.image_url
+            for img in images
+        ]
+        result.append({
+            "id": p.product_id,
+            "name": p.name,
+            "price": p.price,
+            "description": p.description,
+            'images':image_list
+        })
+
+    return jsonify({"products": result}), 200
