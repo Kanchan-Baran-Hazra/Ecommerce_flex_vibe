@@ -7,6 +7,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime,timedelta
 from app.routes.Email_message import genrate_otp,send_mail
 
+DEFAULT_AVATER="./static/avaterS/default_avater.png"
+
 
 login=Blueprint('userLogin', __name__, url_prefix='/userLogin')
 
@@ -35,8 +37,7 @@ def add_role():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
     
-
-
+    
 # 📝 SIGNUP
 @login.route('/signup', methods=['POST'])
 def signup():
@@ -45,24 +46,52 @@ def signup():
     if not data.get("email") or not data.get("password") or not data.get("full_name"):
         return jsonify({"error": "Missing required fields"}), 400
 
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({"error": "Email already exists"}), 400
-    
-    otp=genrate_otp()
-    mess=send_mail(otp,data['full_name'],data['email'])
-    if mess:
-        hashed_pw = generate_password_hash(data['password'])
-        new_user = User(full_name=data['full_name'], email=data['email'], password_hash=hashed_pw)
-        new_user.otp = str(otp)
-        new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-        db.session.add(new_user)
-        db.session.commit()
+    user = User.query.filter_by(email=data['email']).first()
 
-        return jsonify({"message": "User registered successfully",'sig':1}), 201
-    else:
-        return jsonify({'message':'Email not send..','sig':0}), 400
-    
+    # CASE 1: User already exists
+    if user:
+        # OAuth user exists but no password yet
+        if user.password_hash is None:
+            hashed_pw = generate_password_hash(data['password'])
+            user.password_hash = hashed_pw
+            user.full_name = data['full_name']
+            user.auth_provider = 'local'
 
+            db.session.commit()
+
+            return jsonify({
+                "message": "Password added to existing Google account"
+            }), 200
+
+        # Email+password already exists
+        return jsonify({"error": "Email already registered"}), 400
+
+    # CASE 2: New user (normal signup)
+    otp = genrate_otp()
+    mail_sent = send_mail(otp, data['full_name'], data['email'])
+
+    if not mail_sent:
+        return jsonify({"error": "Email not sent"}), 400
+
+    hashed_pw = generate_password_hash(data['password'])
+
+    new_user = User(
+        full_name=data['full_name'],
+        email=data['email'],
+        password_hash=hashed_pw,
+        avatar_url=DEFAULT_AVATER,
+        auth_provider='local'
+    )
+
+    new_user.otp = str(otp)
+    new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"message": "User registered successfully"}), 201
+
+    
 # 🔐 SIGNIN
 @login.route('/signin', methods=['POST'])
 def signin():

@@ -15,14 +15,25 @@ class Role(db.Model):
 
 class User(db.Model):
     __tablename__ = "users"
+
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
     full_name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+
+    password_hash = db.Column(db.String(255), nullable=True)
+
+    oauth_provider = db.Column(db.String(20), nullable=True)
+    oauth_provider_id = db.Column(db.String(255), nullable=True)
+
+    avatar_url = db.Column(db.String(255), nullable=True)
+
     phone = db.Column(db.String(15))
     role_id = db.Column(db.Integer, db.ForeignKey("roles.role_id", ondelete="CASCADE"), default=2)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     verified = db.Column(db.Boolean, default=False)
+
     otp = db.Column(db.String(6))
     otp_expiry = db.Column(db.DateTime)
 
@@ -60,7 +71,7 @@ class Category(db.Model):
     __tablename__ = "categories"
     category_id = db.Column(db.Integer, primary_key=True,autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey("categories.category_id", ondelete="CASCADE"))
+    parent_id = db.Column(db.Integer, db.ForeignKey("categories.category_id", ondelete="CASCADE"),nullable=True)
 
     parent = db.relationship("Category", remote_side=[category_id], backref="subcategories")
     products = db.relationship("Product", back_populates="category", cascade="all, delete")
@@ -83,7 +94,6 @@ class Product(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.Numeric(10, 2), nullable=False)
     discount = db.Column(db.Numeric(5, 2), default=0.00)
-    sku = db.Column(db.String(50), unique=False, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

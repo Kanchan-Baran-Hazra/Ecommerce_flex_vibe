@@ -46,6 +46,9 @@ def create_app():
     from app.routes.otp_verify import otp_ver
     app.register_blueprint(otp_ver)
     
+    from app.routes.Oauth import auth_bp
+    app.register_blueprint(auth_bp)
+    
     # ✅ Cloudinary Config
     cloudinary.config(
         cloud_name = app.config['CLOUDINARY_CLOUD_NAME'],

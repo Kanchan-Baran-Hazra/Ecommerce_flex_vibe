@@ -1,6 +1,6 @@
 from flask import Blueprint,jsonify,request
 from app import db
-from app.models import Brand, Category,Product,ProductImage
+from app.models import Brand, Category,Product,ProductImage,Inventory
 import cloudinary
 import cloudinary.api
 import cloudinary.uploader
@@ -73,16 +73,16 @@ def add_product():
             return jsonify({"message": "At least one image is required"}), 400
         
         for img in images:
-            upload_result = cloudinary.uploader.upload(img)
+            upload_result = cloudinary.uploader.upload(img, folder="products/")
             uploaded_urls.append(upload_result.get('secure_url'))
             uploaded_public_ids.append(upload_result.get('public_id'))
 
+        
         # Create new product
         new_product = Product(
             name=name,
             description=description,
             price=price,
-            sku=stock_quantity,
             category_id=category_id,
             brand_id=brand_id,
             discount=discount,
@@ -90,6 +90,13 @@ def add_product():
         )
 
         db.session.add(new_product)
+        db.session.flush()  # Get product_id before commit
+
+        inventory=Inventory(
+            product_id=new_product.product_id,
+            quantity=stock_quantity
+        )
+        db.session.add(inventory)
         db.session.commit()
 
         return jsonify({
@@ -156,12 +163,13 @@ def get_products():
         product_list = []
         for product in paginated:
             images = ProductImage.query.filter_by(product_id=product.product_id).all()
+            inventory = Inventory.query.filter_by(product_id=product.product_id).first()
             product_data = {
                 "product_id": product.product_id,
                 "name": product.name,
                 "description": product.description,
                 "price": str(product.price),
-                "sku": product.sku,
+                "inventory": inventory.quantity if inventory else 0,
                 "category_id": product.category_id,
                 "brand_id": product.brand_id,
                 "discount": str(product.discount),
